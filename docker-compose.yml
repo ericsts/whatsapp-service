@@ -1,0 +1,12 @@
+services:
+  whatsapp:
+    build: .
+    restart: always
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      PORT: ${PORT:-3000}
+      API_KEY: ${API_KEY}
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
+    volumes:
+      - ./session:/app/session
