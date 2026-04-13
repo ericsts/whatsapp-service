@@ -6,36 +6,15 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// =============================
-// 🔐 API KEY MIDDLEWARE
-// =============================
-const API_KEY = process.env.API_KEY;
-
-app.use((req, res, next) => {
-    if (req.path === '/') {
-        return next();
-    }
-
-    if (!API_KEY) {
-        console.warn('⚠️  API_KEY não definida — acesso liberado (não recomendado em produção)');
-        return next();
-    }
-
-    const key = req.headers['x-api-key'];
-
-    if (key !== API_KEY) {
-        return res.status(401).json({ status: 'error', message: 'Não autorizado' });
-    }
-
-    next();
-});
-
 // Mapa de clientes ativos: clientId => { client, qr, status }
 const clients = {};
 
+const LOCK_FILES = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+
 function removeLockFiles(clientId) {
-    const sessionDir = path.join('./session', `session-${clientId}`, 'Default');
-    ['SingletonLock', 'SingletonSocket', 'SingletonCookie'].forEach(file => {
+    // whatsapp-web.js salva em .wwebjs_auth/session-<clientId>/Default/
+    const sessionDir = path.join('./session', '.wwebjs_auth', `session-${clientId}`, 'Default');
+    LOCK_FILES.forEach(file => {
         const filePath = path.join(sessionDir, file);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -43,6 +22,30 @@ function removeLockFiles(clientId) {
         }
     });
 }
+
+function removeAllLockFiles() {
+    const authDir = path.join('./session', '.wwebjs_auth');
+    if (!fs.existsSync(authDir)) {
+        return;
+    }
+    const entries = fs.readdirSync(authDir);
+    entries.forEach(entry => {
+        if (!entry.startsWith('session-')) {
+            return;
+        }
+        const defaultDir = path.join(authDir, entry, 'Default');
+        LOCK_FILES.forEach(file => {
+            const filePath = path.join(defaultDir, file);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log(`🧹 [startup] Removido lock: ${entry}/${file}`);
+            }
+        });
+    });
+}
+
+// Limpa locks de crashes anteriores ao iniciar
+removeAllLockFiles();
 
 function getOrCreateClient(clientId) {
     if (clients[clientId]) {
@@ -58,15 +61,7 @@ function getOrCreateClient(clientId) {
         }),
         puppeteer: {
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         }
     });
 
@@ -188,7 +183,7 @@ app.get('/', (_req, res) => {
 });
 
 // 🚀 Start server
-const PORT = process.env.PORT || 3000;
+const PORT = 3300;
 
 app.listen(PORT, () => {
     console.log(`🚀 WhatsApp API rodando na porta ${PORT}`);

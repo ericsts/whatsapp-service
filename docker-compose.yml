@@ -3,9 +3,9 @@ services:
     build: .
     restart: always
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - "${PORT:-3300}:${PORT:-3300}"
     environment:
-      PORT: ${PORT:-3000}
+      PORT: ${PORT:-3300}
       API_KEY: ${API_KEY}
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
     volumes:
